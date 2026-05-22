@@ -1,14 +1,19 @@
 /**
  * ZoneRenderer.tsx
- * TODO (Prompt 4): Implement Skia zone renderer.
+ * Per-zone Skia art. Prompt 4+ will implement visuals; wired here for level animation.
  */
 import React from 'react';
-import { ZoneData } from '../../types/zone';
+import type { SharedValue } from 'react-native-reanimated';
+import type { ZoneData } from '../../types/zone';
+import type { ViewBoxLayout } from '../viewBox';
 
-interface ZoneRendererProps {
+export interface ZoneRendererProps {
   zone: ZoneData;
+  layout: ViewBoxLayout;
+  /** Animated 0–1 level — drives future growth transitions (Prompt 4). */
+  animatedLevel: SharedValue<number>;
 }
 
-export function ZoneRenderer({ zone }: ZoneRendererProps) {
+export function ZoneRenderer(_props: ZoneRendererProps) {
   return null;
 }
