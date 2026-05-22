@@ -1,2 +1,10 @@
 node_modules
 coverage
+.expo
+dist
+ios
+android
+*.jks
+*.p8
+*.p12
+*.mobileprovision

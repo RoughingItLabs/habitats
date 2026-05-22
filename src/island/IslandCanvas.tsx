@@ -10,7 +10,9 @@ import {
   LinearGradient,
   vec,
 } from '@shopify/react-native-skia';
+import type { Creature } from '../types/creature';
 import { ZoneData, ZoneId } from '../types/zone';
+import { CreatureSprite } from './creatures/CreatureSprite';
 import { getZonesToRender } from './getZonesToRender';
 import { IslandBase } from './IslandBase';
 import { useAnimatedIslandScale } from './hooks/useAnimatedIslandScale';
@@ -21,6 +23,7 @@ import { ZoneRenderer } from './zones/ZoneRenderer';
 export interface IslandCanvasProps {
   zones: Partial<Record<ZoneId, ZoneData>>;
   islandScale: number;
+  creatures?: Creature[];
   ambientText?: string;
 }
 
@@ -30,6 +33,7 @@ const SKY_BOTTOM = '#1a1030';
 export function IslandCanvas({
   zones,
   islandScale,
+  creatures = [],
 }: IslandCanvasProps) {
   const { width, height } = useWindowDimensions();
   const layout: ViewBoxLayout = useMemo(
@@ -53,6 +57,25 @@ export function IslandCanvas({
     [zones, layout, animatedZoneLevels]
   );
 
+  const creatureNodes = useMemo(
+    () =>
+      creatures.map(creature => {
+        const zone = zones[creature.zoneId];
+        if (!zone) {
+          return null;
+        }
+        return (
+          <CreatureSprite
+            key={creature.id}
+            creature={creature}
+            zoneIsNeglected={zone.isNeglected}
+            layout={layout}
+          />
+        );
+      }),
+    [creatures, zones, layout]
+  );
+
   if (width <= 0 || height <= 0) {
     return null;
   }
@@ -69,8 +92,8 @@ export function IslandCanvas({
 
       <IslandBase layout={layout} scale={animatedScale} />
 
-      {/* Zone art — Prompt 4; levels already animate via shared values */}
       {zoneNodes}
+      {creatureNodes}
     </Canvas>
   );
 }
