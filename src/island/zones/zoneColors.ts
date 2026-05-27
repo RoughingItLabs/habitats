@@ -85,13 +85,30 @@ export function tintHex(
   );
 }
 
-const NEGLECT_TINT = { r: 120, g: 140, b: 110 };
+const NEGLECT_GREY_GREEN = '#4a5a4a';
+
+/** +amount brightness toward white (0.2 = 20% brighter). */
+export function brightenHex(hex: string, amount: number): string {
+  const { r, g, b } = parseHex(hex);
+  return rgbToHex(
+    r + (255 - r) * amount,
+    g + (255 - g) * amount,
+    b + (255 - b) * amount
+  );
+}
 
 export function applyNeglectedColor(hex: string, isNeglected: boolean): string {
   if (!isNeglected) {
     return hex;
   }
-  return tintHex(desaturateHex(hex, 0.4), NEGLECT_TINT, 0.15);
+  return mixHex(hex, NEGLECT_GREY_GREEN, 0.35);
+}
+
+export function applyThrivingColor(hex: string, isThriving: boolean): string {
+  if (!isThriving) {
+    return hex;
+  }
+  return brightenHex(hex, 0.2);
 }
 
 export function buildNeglectedPalette(
@@ -103,6 +120,22 @@ export function buildNeglectedPalette(
     mid: applyNeglectedColor(colors.mid, isNeglected),
     light: applyNeglectedColor(colors.light, isNeglected),
     glow: applyNeglectedColor(colors.glow, isNeglected),
+  };
+}
+
+export function buildZoneVisualPalette(
+  colors: ZonePaletteInput,
+  options: { isNeglected: boolean; isThriving: boolean }
+): ZonePaletteInput {
+  const base = buildNeglectedPalette(colors, options.isNeglected);
+  if (!options.isThriving || options.isNeglected) {
+    return base;
+  }
+  return {
+    primary: applyThrivingColor(base.primary, true),
+    mid: applyThrivingColor(base.mid, true),
+    light: applyThrivingColor(base.light, true),
+    glow: applyThrivingColor(base.glow, true),
   };
 }
 

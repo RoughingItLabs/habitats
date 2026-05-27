@@ -11,7 +11,8 @@ export interface IslandState {
   lastSynced: Date | null;
 }
 
-export type TimeOfDay = 'dawn' | 'morning' | 'afternoon' | 'evening' | 'night';
+export type { TimeOfDay } from '../engine/TimeEngine';
+import type { TimeOfDay } from '../engine/TimeEngine';
 export type Season = 'spring' | 'summer' | 'autumn' | 'winter';
 
 export interface IslandEnvironment {

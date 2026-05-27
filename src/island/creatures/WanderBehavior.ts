@@ -29,6 +29,9 @@ export type { ZoneBounds } from './wanderBehaviorLogic';
 export interface WanderBehaviorOptions {
   zoneBounds: ZoneBounds;
   isNeglected: boolean;
+  isThriving?: boolean;
+  /** Moon Grove creatures rest by day. */
+  nocturnalDayRest?: boolean;
   /** Injectable RNG (e.g. tests). Defaults to Math.random. */
   random?: () => number;
 }
@@ -46,6 +49,8 @@ export interface WanderBehaviorResult {
 export function useWanderBehavior({
   zoneBounds,
   isNeglected,
+  isThriving = false,
+  nocturnalDayRest = false,
   random = Math.random,
 }: WanderBehaviorOptions): WanderBehaviorResult {
   const start = initialWanderPosition(zoneBounds);
@@ -80,7 +85,11 @@ export function useWanderBehavior({
       const from = { x: x.value, y: y.value };
       const dx = target.x - from.x;
       facingDirection.value = facingDirectionFromDelta(dx);
-      const duration = wanderMoveDurationMs(from, target, isNeglected);
+      const duration = wanderMoveDurationMs(from, target, {
+        isNeglected,
+        isThriving,
+        nocturnalDayRest,
+      });
       x.value = withTiming(target.x, {
         duration,
         easing: Easing.inOut(Easing.quad),
@@ -103,12 +112,12 @@ export function useWanderBehavior({
       if (!mountedRef.current) {
         return;
       }
-      const intervalMs = pickWanderIntervalMs(random);
+      const intervalMs = pickWanderIntervalMs(random, isThriving);
       const id = setTimeout(() => {
         if (!mountedRef.current) {
           return;
         }
-        if (shouldEnterIdle(random)) {
+        if (shouldEnterIdle(random, isNeglected)) {
           const idleMs = pickIdleDurationMs(random);
           const idleId = setTimeout(() => {
             pickAndMove();
@@ -130,7 +139,16 @@ export function useWanderBehavior({
       mountedRef.current = false;
       clearAllTimeouts();
     };
-  }, [zoneBounds, isNeglected, random, x, y, facingDirection]);
+  }, [
+    zoneBounds,
+    isNeglected,
+    isThriving,
+    nocturnalDayRest,
+    random,
+    x,
+    y,
+    facingDirection,
+  ]);
 
   return { x, y, bobOffsetPx, facingDirection };
 }

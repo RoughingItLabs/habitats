@@ -39,16 +39,16 @@ describe('wanderBehaviorLogic', () => {
 
     it('uses 0.3x speed when neglected', () => {
       expect(WANDER_NEGLECT_SPEED_FACTOR).toBe(0.3);
-      expect(wanderSpeedFactor(true)).toBe(0.3);
-      expect(wanderSpeedFactor(false)).toBe(1);
+      expect(wanderSpeedFactor({ isNeglected: true })).toBe(0.3);
+      expect(wanderSpeedFactor({ isNeglected: false })).toBe(1);
     });
 
     it('uses 15% idle chance for 1–3 second pauses', () => {
       expect(WANDER_IDLE_CHANCE).toBe(0.15);
       expect(WANDER_IDLE_MIN_MS).toBe(1000);
       expect(WANDER_IDLE_MAX_MS).toBe(3000);
-      expect(shouldEnterIdle(() => 0.14)).toBe(true);
-      expect(shouldEnterIdle(() => 0.15)).toBe(false);
+      expect(shouldEnterIdle(() => 0.14, false)).toBe(true);
+      expect(shouldEnterIdle(() => 0.15, false)).toBe(false);
       expect(pickIdleDurationMs(() => 0)).toBe(1000);
       expect(pickIdleDurationMs(() => 1)).toBe(3000);
     });
@@ -95,15 +95,15 @@ describe('wanderBehaviorLogic', () => {
     it('takes longer to cross the same distance when neglected', () => {
       const from = { x: 10, y: 10 };
       const to = { x: 30, y: 10 };
-      const normal = wanderMoveDurationMs(from, to, false);
-      const neglected = wanderMoveDurationMs(from, to, true);
+      const normal = wanderMoveDurationMs(from, to, { isNeglected: false });
+      const neglected = wanderMoveDurationMs(from, to, { isNeglected: true });
       expect(neglected).toBeGreaterThan(normal);
       expect(neglected / normal).toBeCloseTo(1 / WANDER_NEGLECT_SPEED_FACTOR, 5);
     });
 
     it('returns minimum interval when already at target', () => {
       const point = { x: 15, y: 15 };
-      expect(wanderMoveDurationMs(point, point, false)).toBe(
+      expect(wanderMoveDurationMs(point, point, { isNeglected: false })).toBe(
         WANDER_INTERVAL_MIN_MS
       );
     });

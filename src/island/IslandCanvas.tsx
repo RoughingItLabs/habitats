@@ -1,22 +1,22 @@
 /**
  * IslandCanvas.tsx
- * Root Skia canvas — sky, animated floating island base, zone hooks (Prompt 4).
+ * Root Skia canvas — sky, weather, animated floating island base, zones, creatures.
  */
 import React, { useMemo } from 'react';
 import { StyleSheet, useWindowDimensions } from 'react-native';
-import {
-  Canvas,
-  Fill,
-  LinearGradient,
-  vec,
-} from '@shopify/react-native-skia';
+import { Canvas } from '@shopify/react-native-skia';
 import type { Creature } from '../types/creature';
 import { ZoneData, ZoneId } from '../types/zone';
+import { useIslandStore } from '../store/islandStore';
 import { CreatureSprite } from './creatures/CreatureSprite';
+import { SkyLayer } from './effects/SkyLayer';
+import { WeatherLayer } from './effects/WeatherLayer';
 import { getZonesToRender } from './getZonesToRender';
 import { IslandBase } from './IslandBase';
 import { useAnimatedIslandScale } from './hooks/useAnimatedIslandScale';
 import { useAnimatedZoneLevels } from './hooks/useAnimatedZoneLevels';
+import { useIslandTime } from './hooks/useIslandTime';
+import { useIslandWeather } from './hooks/useIslandWeather';
 import type { ViewBoxLayout } from './viewBox';
 import { ZoneRenderer } from './zones/ZoneRenderer';
 
@@ -27,15 +27,17 @@ export interface IslandCanvasProps {
   ambientText?: string;
 }
 
-const SKY_TOP = '#2a1848';
-const SKY_BOTTOM = '#1a1030';
-
 export function IslandCanvas({
   zones,
   islandScale,
   creatures = [],
 }: IslandCanvasProps) {
   const { width, height } = useWindowDimensions();
+  const timeOfDay = useIslandStore(state => state.timeOfDay);
+
+  useIslandTime();
+  useIslandWeather();
+
   const layout: ViewBoxLayout = useMemo(
     () => ({ width, height }),
     [width, height]
@@ -68,12 +70,13 @@ export function IslandCanvas({
           <CreatureSprite
             key={creature.id}
             creature={creature}
-            zoneIsNeglected={zone.isNeglected}
+            zone={zone}
+            timeOfDay={timeOfDay}
             layout={layout}
           />
         );
       }),
-    [creatures, zones, layout]
+    [creatures, zones, layout, timeOfDay]
   );
 
   if (width <= 0 || height <= 0) {
@@ -82,16 +85,9 @@ export function IslandCanvas({
 
   return (
     <Canvas style={styles.canvas}>
-      <Fill>
-        <LinearGradient
-          start={vec(0, 0)}
-          end={vec(0, height)}
-          colors={[SKY_TOP, SKY_BOTTOM]}
-        />
-      </Fill>
-
+      <SkyLayer width={width} height={height} />
+      <WeatherLayer layout={layout} zones={zones} />
       <IslandBase layout={layout} scale={animatedScale} />
-
       {zoneNodes}
       {creatureNodes}
     </Canvas>

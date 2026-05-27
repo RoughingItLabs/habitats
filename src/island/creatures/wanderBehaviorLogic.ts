@@ -13,8 +13,13 @@ export interface ZoneBounds {
 
 export const WANDER_INTERVAL_MIN_MS = 2500;
 export const WANDER_INTERVAL_MAX_MS = 5000;
+export const WANDER_THRIVING_INTERVAL_MIN_MS = 1500;
+export const WANDER_THRIVING_INTERVAL_MAX_MS = 2800;
 export const WANDER_NEGLECT_SPEED_FACTOR = 0.3;
+export const WANDER_THRIVING_SPEED_FACTOR = 1.25;
+export const WANDER_NOCTURNAL_DAY_SPEED_FACTOR = 0.65;
 export const WANDER_IDLE_CHANCE = 0.15;
+export const WANDER_NEGLECT_IDLE_CHANCE = 0.6;
 export const WANDER_IDLE_MIN_MS = 1000;
 export const WANDER_IDLE_MAX_MS = 3000;
 export const WANDER_BOB_AMPLITUDE_PX = 1.5;
@@ -40,7 +45,17 @@ export function randomInRange(
   return min + rng() * (max - min);
 }
 
-export function pickWanderIntervalMs(rng: () => number = Math.random): number {
+export function pickWanderIntervalMs(
+  rng: () => number = Math.random,
+  isThriving = false
+): number {
+  if (isThriving) {
+    return randomInRange(
+      WANDER_THRIVING_INTERVAL_MIN_MS,
+      WANDER_THRIVING_INTERVAL_MAX_MS,
+      rng
+    );
+  }
   return randomInRange(WANDER_INTERVAL_MIN_MS, WANDER_INTERVAL_MAX_MS, rng);
 }
 
@@ -48,12 +63,29 @@ export function pickIdleDurationMs(rng: () => number = Math.random): number {
   return randomInRange(WANDER_IDLE_MIN_MS, WANDER_IDLE_MAX_MS, rng);
 }
 
-export function shouldEnterIdle(rng: () => number = Math.random): boolean {
-  return rng() < WANDER_IDLE_CHANCE;
+export function shouldEnterIdle(
+  rng: () => number = Math.random,
+  isNeglected = false
+): boolean {
+  const chance = isNeglected ? WANDER_NEGLECT_IDLE_CHANCE : WANDER_IDLE_CHANCE;
+  return rng() < chance;
 }
 
-export function wanderSpeedFactor(isNeglected: boolean): number {
-  return isNeglected ? WANDER_NEGLECT_SPEED_FACTOR : 1;
+export function wanderSpeedFactor(options: {
+  isNeglected: boolean;
+  isThriving?: boolean;
+  nocturnalDayRest?: boolean;
+}): number {
+  if (options.isNeglected) {
+    return WANDER_NEGLECT_SPEED_FACTOR;
+  }
+  if (options.nocturnalDayRest) {
+    return WANDER_NOCTURNAL_DAY_SPEED_FACTOR;
+  }
+  if (options.isThriving) {
+    return WANDER_THRIVING_SPEED_FACTOR;
+  }
+  return 1;
 }
 
 export function randomTargetInBounds(
@@ -101,13 +133,17 @@ export function lerpPosition(
 export function wanderMoveDurationMs(
   from: { x: number; y: number },
   to: { x: number; y: number },
-  isNeglected: boolean,
+  speedOptions: {
+    isNeglected: boolean;
+    isThriving?: boolean;
+    nocturnalDayRest?: boolean;
+  },
   baseSpeedVbPerSec = WANDER_BASE_SPEED_VB_PER_SEC
 ): number {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const distance = Math.sqrt(dx * dx + dy * dy);
-  const speed = baseSpeedVbPerSec * wanderSpeedFactor(isNeglected);
+  const speed = baseSpeedVbPerSec * wanderSpeedFactor(speedOptions);
   if (speed <= 0 || distance === 0) {
     return WANDER_INTERVAL_MIN_MS;
   }

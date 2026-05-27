@@ -21,6 +21,7 @@ import {
 } from 'react-native-reanimated';
 import { ZONE_DEFINITIONS } from '../../constants/zones';
 import type { ZoneData } from '../../types/zone';
+import { useIslandStore } from '../../store/islandStore';
 import {
   vbEllipseRect,
   vbW,
@@ -29,7 +30,7 @@ import {
   type ViewBoxLayout,
 } from '../viewBox';
 import {
-  buildNeglectedPalette,
+  buildZoneVisualPalette,
   glowColorStops,
   terrainColorStops,
 } from './zoneColors';
@@ -45,6 +46,21 @@ import {
   moonGroveTreesOpacity,
   moonGroveVisualLevel,
 } from './moonGroveLogic';
+import { MoonGroveNightEffects } from './MoonGroveNightEffects';
+import {
+  isMoonGroveNightTime,
+  moonGroveDayDimFactor,
+  moonGroveNightBrightnessFactor,
+  moonGroveShowsBioluminescence,
+} from './moonGroveNightLogic';
+import { ZoneNeglectedOverlay } from './ZoneNeglectedOverlay';
+import { ZoneShimmer } from './ZoneShimmer';
+import { ZoneThrivingOverlay } from './ZoneThrivingOverlay';
+import {
+  zoneIsShimmer,
+  zoneIsThriving,
+  zoneVisualMode,
+} from './zoneVisualState';
 
 const DEF = ZONE_DEFINITIONS.moongrove;
 
@@ -71,7 +87,27 @@ export interface MoonGroveProps {
 }
 
 export function MoonGrove({ zone, layout, animatedLevel }: MoonGroveProps) {
-  const colors = buildNeglectedPalette(DEF.colors, zone.isNeglected);
+  const timeOfDay = useIslandStore(state => state.timeOfDay);
+  const mode = zoneVisualMode(zone);
+  const isThriving = zoneIsThriving(zone);
+  const isShimmer = zoneIsShimmer(zone);
+
+  if (isShimmer) {
+    return <ZoneShimmer def={DEF} layout={layout} />;
+  }
+
+  const palette = buildZoneVisualPalette(DEF.colors, {
+    isNeglected: zone.isNeglected,
+    isThriving,
+  });
+  const nightFactor = moonGroveNightBrightnessFactor(timeOfDay);
+  const dayDim = moonGroveDayDimFactor(timeOfDay);
+  const colors = {
+    primary: palette.primary,
+    mid: palette.mid,
+    light: palette.light,
+    glow: palette.glow,
+  };
   const terrainStops = terrainColorStops(colors);
   const glowStops = glowColorStops(colors);
   const trunkColor = colors.primary;
@@ -94,21 +130,25 @@ export function MoonGrove({ zone, layout, animatedLevel }: MoonGroveProps) {
     moonGroveVisualLevel(animatedLevel.value, zone.peakLevelEver)
   );
 
-  const glowOpacity = useDerivedValue(() =>
-    moonGroveGlowOpacity(visualLevel.value, pulsePhase.value)
-  );
+  const glowOpacity = useDerivedValue(() => {
+    const base = moonGroveGlowOpacity(visualLevel.value, pulsePhase.value);
+    const neglectDim = zone.isNeglected ? 0.6 : 1;
+    return base * nightFactor * dayDim * neglectDim;
+  });
 
   const terrainOpacity = useDerivedValue(() =>
-    moonGroveTerrainOpacity(visualLevel.value)
+    moonGroveTerrainOpacity(visualLevel.value) * dayDim
   );
 
   const treesOpacity = useDerivedValue(() =>
-    moonGroveTreesOpacity(visualLevel.value)
+    moonGroveTreesOpacity(visualLevel.value) * dayDim
   );
 
-  const lushOpacity = useDerivedValue(() =>
-    moonGroveLushOpacity(visualLevel.value)
-  );
+  const lushOpacity = useDerivedValue(() => {
+    const base = moonGroveLushOpacity(visualLevel.value);
+    const neglectDim = zone.isNeglected ? 0.6 : 1;
+    return base * nightFactor * dayDim * neglectDim;
+  });
 
   const terrainColor = useDerivedValue(() =>
     interpolateColor(
@@ -147,6 +187,9 @@ export function MoonGrove({ zone, layout, animatedLevel }: MoonGroveProps) {
     MOON_GROVE_INNER_RADIUS.ry,
     layout
   );
+
+  const showBio = moonGroveShowsBioluminescence(timeOfDay);
+  const showOrbits = isThriving && isMoonGroveNightTime(timeOfDay);
 
   return (
     <Group>
@@ -214,6 +257,35 @@ export function MoonGrove({ zone, layout, animatedLevel }: MoonGroveProps) {
           />
         ))}
       </Group>
+
+      {mode === 'neglected' ? (
+        <ZoneNeglectedOverlay
+          def={DEF}
+          layout={layout}
+          centerCx={MOON_GROVE_CENTER.cx}
+          centerCy={MOON_GROVE_CENTER.cy}
+          seed={zone.id.charCodeAt(0)}
+        />
+      ) : null}
+
+      {isThriving ? (
+        <ZoneThrivingOverlay
+          def={DEF}
+          layout={layout}
+          centerCx={MOON_GROVE_CENTER.cx}
+          centerCy={MOON_GROVE_CENTER.cy}
+          seed={zone.id.charCodeAt(0) + 10}
+        />
+      ) : null}
+
+      <MoonGroveNightEffects
+        layout={layout}
+        centerCx={MOON_GROVE_CENTER.cx}
+        centerCy={MOON_GROVE_CENTER.cy}
+        showBioluminescence={showBio}
+        showOrbits={showOrbits}
+        seed={zone.id.charCodeAt(0) + 20}
+      />
     </Group>
   );
 }
