@@ -1,6 +1,7 @@
 import type { ExpoConfig } from 'expo/config';
 
-const config: ExpoConfig = {
+// newArchEnabled is valid in Expo 56 but not yet reflected in the ExpoConfig type
+const config: ExpoConfig & { newArchEnabled?: boolean } = {
   name: 'Habitats',
   slug: 'habitats',
   version: '1.0.0',
@@ -21,7 +22,6 @@ const config: ExpoConfig = {
   plugins: [
     'expo-router',
     'expo-font',
-    'expo-dev-client',
   ],
   experiments: {
     typedRoutes: true,

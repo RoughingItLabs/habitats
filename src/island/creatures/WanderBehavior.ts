@@ -51,7 +51,7 @@ export function useWanderBehavior({
   const start = initialWanderPosition(zoneBounds);
   const x = useSharedValue(start.x);
   const y = useSharedValue(start.y);
-  const facingDirection = useSharedValue<1 | -1>(1);
+  const facingDirection = useSharedValue<number>(1);
   const bobPhase = useSharedValue(0);
   const mountedRef = useRef(true);
 

@@ -7,18 +7,22 @@ export interface ViewBoxLayout {
 }
 
 export function vbX(x: number, layout: ViewBoxLayout): number {
+  'worklet';
   return (x / VIEWBOX_SIZE) * layout.width;
 }
 
 export function vbY(y: number, layout: ViewBoxLayout): number {
+  'worklet';
   return (y / VIEWBOX_SIZE) * layout.height;
 }
 
 export function vbW(w: number, layout: ViewBoxLayout): number {
+  'worklet';
   return (w / VIEWBOX_SIZE) * layout.width;
 }
 
 export function vbH(h: number, layout: ViewBoxLayout): number {
+  'worklet';
   return (h / VIEWBOX_SIZE) * layout.height;
 }
 
@@ -30,6 +34,7 @@ export function vbEllipseRect(
   ry: number,
   layout: ViewBoxLayout
 ): { x: number; y: number; width: number; height: number } {
+  'worklet';
   return {
     x: vbX(cx - rx, layout),
     y: vbY(cy - ry, layout),

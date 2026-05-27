@@ -21,7 +21,7 @@ export function useAnimatedZoneLevels(
     () =>
       Object.fromEntries(
         ALL_ZONE_IDS.map(id => [id, makeMutable(zones[id]?.level ?? 0)])
-      ) as AnimatedZoneLevels,
+      ) as unknown as AnimatedZoneLevels,
     []
   );
 

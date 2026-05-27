@@ -82,6 +82,7 @@ export function verticalBobOffset(
   phaseRadians: number,
   amplitudePx = WANDER_BOB_AMPLITUDE_PX
 ): number {
+  'worklet';
   return Math.sin(phaseRadians) * amplitudePx;
 }
 

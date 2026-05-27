@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["@jest/globals"],
+    "typeRoots": ["./node_modules/@types", "./node_modules"]
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/__tests__/**/*.ts",
+    "src/**/__tests__/**/*.tsx",
+    "src/**/__mocks__/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}

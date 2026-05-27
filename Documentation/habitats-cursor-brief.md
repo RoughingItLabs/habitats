@@ -1421,3 +1421,628 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 ---
 
 *Habitats — Agent Architecture v1.0 — Added to Cursor Brief*
+
+---
+
+---
+
+# 🌱 TENDING SYSTEM (GOALS)
+
+## Philosophy
+Tending is how users set personal intentions and link them to verified data sources.
+It layers on top of the organic island system — it never replaces it.
+The checklist is celebratory, never punishing. Missing a day is a quiet non-event.
+Progress is recorded as "what you did" not "what you failed to do."
+
+---
+
+## Data Types
+
+```typescript
+// src/types/tending.ts
+
+export type TendingFrequency = 'daily' | 'weekly';
+
+export type TendingStatus = 'active' | 'completed' | 'expired';
+
+export type VerificationSource =
+  | 'healthkit'
+  | 'health_connect'
+  | 'myfitnesspal'
+  | 'strava'
+  | 'garmin'
+  | 'manual';         // User taps to confirm — no external verification
+
+export interface TendingTemplate {
+  id: string;
+  name: string;             // "Tend to my Crystal Springs"
+  description: string;      // "Drink water consistently"
+  zoneId: ZoneId;
+  activityType: ActivityType;
+  defaultTarget: number;
+  targetUnit: string;
+  verificationSource: VerificationSource;
+  icon: string;
+}
+
+export interface TendingIntention {
+  id: string;
+  userId: string;
+  name: string;             // User-written or from template
+  zoneId: ZoneId;
+  activityType: ActivityType;
+  target: number;           // Soft target — direction not hard requirement
+  targetUnit: string;
+  targetType: 'daily' | 'weekly' | 'more_than_last_week';
+  verificationSource: VerificationSource;
+  verificationConfig: Record<string, any>;   // Source-specific config
+  startDate: string;        // ISO date
+  endDate: string;          // ISO date — intentions have a natural lifespan
+  status: TendingStatus;
+  createdAt: Date;
+}
+
+export interface TendingEntry {
+  id: string;
+  intentionId: string;
+  userId: string;
+  date: string;             // ISO date
+  verified: boolean;        // Did data confirm this?
+  verifiedValue: number;    // Actual value from data source
+  verifiedAt: Date;
+  source: VerificationSource;
+}
+
+export interface TendingProgress {
+  intentionId: string;
+  totalDays: number;        // Days in the intention period
+  tendedDays: number;       // Days with verified activity
+  currentMonthEntries: TendingEntry[];
+  phraseOfProgress: string; // "Tended 18 times this month" — never a percentage
+}
+```
+
+---
+
+## Tending Templates
+
+```typescript
+// src/constants/tendingTemplates.ts
+
+export const TENDING_TEMPLATES: TendingTemplate[] = [
+  {
+    id: 'crystal_springs_water',
+    name: 'Tend to my Crystal Springs',
+    description: 'Drink water consistently',
+    zoneId: 'crystalsprings',
+    activityType: 'hydration',
+    defaultTarget: 8,
+    targetUnit: 'cups',
+    verificationSource: 'myfitnesspal',
+    icon: '💧',
+  },
+  {
+    id: 'meadow_steps',
+    name: 'Walk with the Meadow',
+    description: 'Move a little every day',
+    zoneId: 'meadow',
+    activityType: 'steps',
+    defaultTarget: 7000,
+    targetUnit: 'steps',
+    verificationSource: 'healthkit',
+    icon: '👣',
+  },
+  {
+    id: 'moon_grove_sleep',
+    name: 'Honour the Moon Grove',
+    description: 'Protect your sleep',
+    zoneId: 'moongrove',
+    activityType: 'sleep',
+    defaultTarget: 420,
+    targetUnit: 'minutes',
+    verificationSource: 'healthkit',
+    icon: '🌙',
+  },
+  {
+    id: 'ember_trail_run',
+    name: 'Run the Ember Trail',
+    description: 'Keep moving forward',
+    zoneId: 'embertrail',
+    activityType: 'running',
+    defaultTarget: 3000,
+    targetUnit: 'meters',
+    verificationSource: 'strava',
+    icon: '🏃',
+  },
+  {
+    id: 'zen_clearing_mindful',
+    name: 'Sit in the Zen Clearing',
+    description: 'A few minutes of stillness',
+    zoneId: 'zenclearing',
+    activityType: 'mindfulness',
+    defaultTarget: 10,
+    targetUnit: 'minutes',
+    verificationSource: 'healthkit',
+    icon: '🍃',
+  },
+  {
+    id: 'harvest_glen_nutrition',
+    name: 'Tend the Harvest Glen',
+    description: 'Log what you eat',
+    zoneId: 'harvestglen',
+    activityType: 'nutrition',
+    defaultTarget: 1,
+    targetUnit: 'logged day',
+    verificationSource: 'myfitnesspal',
+    icon: '🌾',
+  },
+  // Freeform template — user fills in all fields
+  {
+    id: 'freeform',
+    name: 'Create your own intention',
+    description: 'Link any activity to any zone',
+    zoneId: 'meadow',          // Default — user changes
+    activityType: 'steps',     // Default — user changes
+    defaultTarget: 0,
+    targetUnit: '',
+    verificationSource: 'manual',
+    icon: '✨',
+  },
+];
+```
+
+---
+
+## Tending UI — Three Screens
+
+### Screen 1: Tend Tab
+```
+- List of active intentions with a soft progress visual per intention
+- Each card shows:
+    - Zone illustration (small, glowing if tended today)
+    - Intention name
+    - Monthly calendar grid — tended days show a soft filled dot, untended = empty
+    - "Tended X times this month" — always phrased as what you DID
+    - Today's status: glowing checkmark if verified, soft empty circle if not yet
+- "Add an intention" button at bottom
+- No streaks displayed anywhere. No percentages. No "X day streak."
+```
+
+### Screen 2: Add Intention Flow
+```
+Step 1: Choose a template OR "create your own"
+Step 2: Customize target (soft slider — "a little", "some", "a lot" maps to values)
+        Advanced users can tap to enter exact number
+Step 3: Choose verification source — shows connected apps first
+        If source not connected, gentle "connect to verify automatically,
+        or tap to confirm manually"
+Step 4: Set duration — this month / next 30 days / ongoing
+Step 5: Confirm — shown as "Your intention is set 🌱"
+        Island immediately shows a soft glow on the linked zone
+```
+
+### Screen 3: Month in Review
+```
+- Shown at end of each month — gentle card, not a report
+- "Your tending this month" — visual garden of dots
+- Which zones received the most tending
+- A generated sentence from the Narration Agent about the month
+- "Start fresh" button — previous intentions archive quietly
+```
+
+---
+
+## Verification Engine
+
+```typescript
+// src/engine/TendingVerificationEngine.ts
+
+export class TendingVerificationEngine {
+
+  // Runs after each health data sync
+  async verifyAllActiveIntentions(
+    userId: string,
+    intentions: TendingIntention[],
+    activityCache: DailyActivity[]
+  ): Promise<TendingEntry[]> {
+    const today = new Date().toISOString().split('T')[0];
+    const newEntries: TendingEntry[] = [];
+
+    for (const intention of intentions) {
+      if (intention.status !== 'active') continue;
+
+      // Skip if already verified today
+      const alreadyVerified = await this.isVerifiedToday(intention.id, today);
+      if (alreadyVerified) continue;
+
+      const verified = await this.checkIntention(intention, activityCache, today);
+      if (verified.met) {
+        newEntries.push({
+          id: crypto.randomUUID(),
+          intentionId: intention.id,
+          userId,
+          date: today,
+          verified: true,
+          verifiedValue: verified.value,
+          verifiedAt: new Date(),
+          source: intention.verificationSource,
+        });
+      }
+    }
+    return newEntries;
+  }
+
+  private async checkIntention(
+    intention: TendingIntention,
+    activities: DailyActivity[],
+    date: string
+  ): Promise<{ met: boolean; value: number }> {
+
+    if (intention.verificationSource === 'manual') {
+      // Manual intentions are never auto-verified — user taps to confirm
+      return { met: false, value: 0 };
+    }
+
+    const todayActivities = activities.filter(
+      a => a.type === intention.activityType && a.date === date
+    );
+    const total = todayActivities.reduce((sum, a) => sum + a.value, 0);
+
+    if (intention.targetType === 'more_than_last_week') {
+      const lastWeekAvg = this.getLastWeekAverage(activities, intention.activityType, date);
+      return { met: total > lastWeekAvg, value: total };
+    }
+
+    return { met: total >= intention.target, value: total };
+  }
+
+  private getLastWeekAverage(
+    activities: DailyActivity[],
+    type: ActivityType,
+    today: string
+  ): number {
+    // Average of same day last week ± 2 days
+    const values = [];
+    for (let d = 5; d <= 9; d++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - d);
+      const dateStr = date.toISOString().split('T')[0];
+      const dayTotal = activities
+        .filter(a => a.type === type && a.date === dateStr)
+        .reduce((sum, a) => sum + a.value, 0);
+      if (dayTotal > 0) values.push(dayTotal);
+    }
+    return values.length > 0
+      ? values.reduce((s, v) => s + v, 0) / values.length
+      : 0;
+  }
+}
+```
+
+---
+
+## Wellness Principles — Tending Rules
+
+```
+1. Soft targets only — no hard pass/fail. "Toward 8 cups" not "8 cups or fail."
+2. Language is always additive — "tended X days", never "missed X days"
+3. Monthly calendar dots are filled for tended days, EMPTY (not red/X) for untended
+4. Intentions expire quietly — no "you abandoned your intention" message
+5. Manual verification is always available — no one is locked out for not having an app
+6. Target type "more than last week" is always available — meets people where they are
+7. Zone glow from tending is ADDITIVE to organic zone level — never replaces it
+8. Missing a tended day never affects zone level negatively — only positive contribution
+9. No tending leaderboards, no sharing tending progress with friends
+10. Max 3 active intentions at once — prevents overwhelm
+```
+
+---
+
+---
+
+# 👫 SOCIAL — FRIENDS & VISITING
+
+## Philosophy
+Social in Habitats is about *presence and gifting*, not performance or comparison.
+You visit a friend's island the way you'd visit someone's home — with curiosity and warmth.
+You never see their health data. You never compare islands. You just leave something kind.
+
+---
+
+## Data Types
+
+```typescript
+// src/types/social.ts
+
+export interface FriendConnection {
+  id: string;
+  userId: string;
+  friendId: string;
+  status: 'pending' | 'accepted';
+  connectedAt: Date;
+  canVisit: boolean;        // Friend has sharing enabled
+  lastVisitedAt: Date | null;
+}
+
+export interface IslandVisit {
+  id: string;
+  visitorId: string;
+  hostId: string;
+  visitedAt: Date;
+}
+
+export type DriftgiftType =
+  | 'shell'           // Common — found on any beach
+  | 'firefly_jar'     // Uncommon — glows at night
+  | 'river_stone'     // Common — smooth and warm
+  | 'pressed_flower'  // Uncommon — seasonal
+  | 'moon_shard'      // Rare — from Moon Grove
+  | 'ember_coal'      // Rare — from Ember Trail
+  | 'sea_glass'       // Uncommon — from Tidal Lagoon
+  | 'golden_acorn';   // Rare — seasonal only
+
+export interface Driftgift {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  type: DriftgiftType;
+  message: string | null;   // Optional short note (max 60 chars)
+  sentAt: Date;
+  discoveredAt: Date | null; // null = not yet discovered
+  beachPosition: { x: number; y: number };
+}
+
+export interface PublicIslandView {
+  // What a visiting friend can see — NO health data
+  ownerDisplayName: string;
+  islandAge: number;          // Days since first use
+  activeZoneNames: string[];  // Zone names only — not levels or activity types
+  creatures: {
+    name: string;
+    species: CreatureSpecies;
+    stage: CreatureStage;
+    zoneId: ZoneId;
+  }[];
+  currentSeason: string;
+  timeOfDay: string;
+  undiscoveredGifts: number;  // How many gifts waiting (shown to owner only)
+}
+```
+
+---
+
+## Social Features
+
+### Friend Connections
+```
+- Add friends via shareable invite link or 6-character island code
+- Friend request flow: send → friend accepts → both can visit
+- Sharing is opt-in per friendship — you can be friends but keep island private
+- Max 20 friends — keeps it intimate, not a social network
+- No suggested friends, no "people you may know" — privacy first
+```
+
+### Visiting a Friend's Island
+```
+- Friend's island renders exactly like yours — same isometric view
+- Creatures wander normally — you can tap them to see name + species
+- Zone names visible, zone LEVELS not shown, activity types not shown
+- No numbers anywhere on a visited island
+- Cannot interact with anything except leaving a Driftgift
+- Visit logged to show friend "someone visited recently" (no name shown by default,
+  optional to reveal in settings)
+- Stay as long as you want — it's just a peaceful place to be
+```
+
+### Driftgifts
+```
+- Each user has a small inventory of Driftgifts
+- Earned via: Moss Coins, seasonal pass rewards, magical moments
+- To send: tap "Leave something" while visiting → choose gift type →
+  optional short note (60 chars max) → gift appears on their beach
+- Owner discovers it organically — no push notification
+- Gift washes up in a random beach spot, glows softly
+- Tap to reveal: gift type animates open, note appears if included
+- Kept in a "Found on my shore" collection — permanent memory
+- Sending a gift costs Moss Coins (1-5 depending on rarity)
+  Common gifts earnable for free through activity
+```
+
+### Friends Tab UI
+```
+- List of friends with their island name + last active (days ago, not exact time)
+- Soft avatar — their island's dominant zone color as a circle
+- "Visit" button — loads their island
+- "Send a gift" shortcut
+- Pending invites section
+- Your island code / shareable link
+- NO: activity stats, zone levels, health data, comparison of any kind
+```
+
+---
+
+## Engagement Loops — Social
+
+```
+Discovery loop:
+  Friend visits → leaves Driftgift → you open app → notice glowing object on beach
+  → tap to discover → feel warm → want to visit their island back
+
+Gifting loop:
+  Earn Moss Coins from activity → spend on rare Driftgift → send to friend
+  → activity earns social currency → motivation to move
+
+Curiosity loop:
+  Friend's island looks different than last week → their moon grove grew →
+  wonder what they've been doing → no data shown → mystery preserved → revisit
+
+Seasonal loop:
+  Seasonal gifts only available during that season → create urgency without anxiety
+  → "I want to send a Cherry Blossom pressed flower before the season ends"
+```
+
+---
+
+## Wellness Principles — Social Rules
+
+```
+1. No health data ever visible to friends — zones show as living environments only
+2. No comparison between islands — no "your island vs friend's island"
+3. No leaderboards, no activity rankings, no steps comparisons
+4. Visiting is passive — you watch, you leave something kind, you go
+5. Driftgift messages are 60 chars max — a note, not a conversation
+  (Habitats is not a messaging app)
+6. Friend count capped at 20 — intimate circle, not a follower system
+7. Visit notifications are opt-in — default is silent discovery
+8. No public profiles — islands are only visible to accepted friends
+9. "Someone visited recently" is the most specific social signal shown
+10. Gifting costs something (Moss Coins) — makes it meaningful, not spam
+```
+
+---
+
+## Supabase Schema — Social & Tending
+
+```sql
+-- Tending intentions
+create table public.tending_intentions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles not null,
+  name text not null,
+  zone_id text not null,
+  activity_type text not null,
+  target float not null,
+  target_unit text not null,
+  target_type text not null default 'daily',
+  verification_source text not null,
+  verification_config jsonb default '{}',
+  start_date date not null,
+  end_date date,
+  status text not null default 'active',
+  created_at timestamptz default now()
+);
+
+-- Tending entries — one per verified day
+create table public.tending_entries (
+  id uuid primary key default gen_random_uuid(),
+  intention_id uuid references public.tending_intentions not null,
+  user_id uuid references public.profiles not null,
+  date date not null,
+  verified boolean not null default false,
+  verified_value float,
+  verified_at timestamptz,
+  source text not null,
+  unique(intention_id, date)
+);
+
+-- Friend connections
+create table public.friend_connections (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles not null,
+  friend_id uuid references public.profiles not null,
+  status text not null default 'pending',
+  can_visit boolean default false,
+  connected_at timestamptz default now(),
+  unique(user_id, friend_id)
+);
+
+-- Island visit log
+create table public.island_visits (
+  id uuid primary key default gen_random_uuid(),
+  visitor_id uuid references public.profiles not null,
+  host_id uuid references public.profiles not null,
+  visited_at timestamptz default now()
+);
+
+-- Driftgifts
+create table public.driftgifts (
+  id uuid primary key default gen_random_uuid(),
+  from_user_id uuid references public.profiles not null,
+  to_user_id uuid references public.profiles not null,
+  gift_type text not null,
+  message text check (char_length(message) <= 60),
+  sent_at timestamptz default now(),
+  discovered_at timestamptz,
+  beach_position_x float not null,
+  beach_position_y float not null
+);
+
+-- User island codes for sharing
+create table public.island_codes (
+  user_id uuid references public.profiles primary key,
+  code text not null unique,    -- 6 char alphanumeric
+  created_at timestamptz default now()
+);
+
+-- RLS
+alter table public.tending_intentions enable row level security;
+alter table public.tending_entries enable row level security;
+alter table public.friend_connections enable row level security;
+alter table public.island_visits enable row level security;
+alter table public.driftgifts enable row level security;
+alter table public.island_codes enable row level security;
+
+create policy "Users own tending" on public.tending_intentions
+  for all using (auth.uid() = user_id);
+create policy "Users own entries" on public.tending_entries
+  for all using (auth.uid() = user_id);
+create policy "Users see own connections" on public.friend_connections
+  for all using (auth.uid() = user_id or auth.uid() = friend_id);
+create policy "Hosts see visits" on public.island_visits
+  for select using (auth.uid() = host_id or auth.uid() = visitor_id);
+create policy "Users see own gifts" on public.driftgifts
+  for all using (auth.uid() = from_user_id or auth.uid() = to_user_id);
+create policy "Users own island code" on public.island_codes
+  for all using (auth.uid() = user_id);
+```
+
+---
+
+## Cursor Prompts — Tending & Social
+
+### Tending Prompt 1 — Intentions Store & Engine
+```
+Implement the TendingVerificationEngine as specified.
+Create a tendingStore in Zustand with:
+  - activeIntentions: TendingIntention[]
+  - entries: Record<string, TendingEntry[]>  (keyed by intentionId)
+  - addIntention(template, customizations)
+  - verifyToday(intentionId)   // manual tap verification
+  - getProgress(intentionId): TendingProgress
+
+TendingProgress.phraseOfProgress must ALWAYS be phrased as
+"Tended X times" or "Tended X days this month" — never as a percentage,
+never as "missed", never as a ratio.
+Write unit tests for phraseOfProgress generation.
+```
+
+### Tending Prompt 2 — Tend Tab UI
+```
+Build the Tend tab screen with:
+- List of active TendingIntention cards
+- Each card shows a 5-week calendar grid of dots (filled = tended, empty = not)
+- Dots are the zone's light color when filled, rgba(255,255,255,0.1) when empty
+- NO red dots, NO X marks, NO streak indicators
+- Today's dot pulses softly if not yet tended
+- "Tended X times this month" label under each card
+- Tap card → expand to show verification source and manual confirm button
+- "Add intention" sheet with template picker and freeform option
+- Max 3 active intentions enforced in UI
+```
+
+### Social Prompt 1 — Friends & Visiting
+```
+Build the Friends tab with:
+- Friend list showing display name + dominant zone color avatar + "Visit" button
+- Add friend flow: enter island code → send request → pending state
+- Generate a unique 6-char island code for each user on signup (store in island_codes)
+- "Visit" loads a read-only version of IslandCanvas with the friend's PublicIslandView
+- Visited island shows creatures wandering but no zone level numbers
+- "Leave a gift" FAB appears when visiting — opens Driftgift picker
+- Driftgift renders on beach as a glowing SVG object
+- Owner discovers it with no notification — glowing object just appears on next open
+```
+
+---
+
+*Habitats — Tending & Social Systems v1.0 — Added to Cursor Brief*
