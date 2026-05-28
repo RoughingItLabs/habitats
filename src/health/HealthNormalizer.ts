@@ -1,25 +1,43 @@
 /**
  * HealthNormalizer.ts
- * All health sources → ActivityData type.
- * Single normalization point — keeps all bridges consistent.
+ * Single normalization point — all health sources produce DailyActivity rows here.
  */
-import { DailyActivity, ActivitySummary, ActivityType } from '../types/activity';
+import {
+  DailyActivity,
+  ActivitySummary,
+  ActivityType,
+} from '../types/activity';
 import { calculateActivityLevel } from '../engine/ZoneEngine';
-import { GOAL_REFERENCES } from '../constants/zones';
 
-export function computeActivitySummaries(
+export type { DailyActivity };
+
+export interface NormalizedHealthData {
+  fetchedAt: Date;
+  source: string;
+  activities: DailyActivity[];
+}
+
+const ALL_ACTIVITY_TYPES: ActivityType[] = [
+  'steps',
+  'sleep',
+  'running',
+  'swimming',
+  'strength',
+  'cycling',
+  'mindfulness',
+  'hydration',
+  'nutrition',
+];
+
+export function normalizeToActivitySummaries(
   activities: DailyActivity[],
   today: Date
 ): ActivitySummary[] {
-  const activityTypes: ActivityType[] = [
-    'steps', 'sleep', 'running', 'swimming', 'strength',
-    'cycling', 'mindfulness', 'hydration', 'nutrition',
-  ];
-
-  return activityTypes.map(type => {
+  return ALL_ACTIVITY_TYPES.filter(type =>
+    activities.some(a => a.type === type)
+  ).map(type => {
     const level = calculateActivityLevel(activities, type, today);
 
-    // Get most recent value for display
     const recent = activities
       .filter(a => a.type === type)
       .sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -34,6 +52,9 @@ export function computeActivitySummaries(
     return { type, level, recentValue, source, trend };
   });
 }
+
+/** @deprecated Use normalizeToActivitySummaries */
+export const computeActivitySummaries = normalizeToActivitySummaries;
 
 function formatActivityValue(
   value: number,
@@ -51,14 +72,37 @@ function calculateTrend(
   type: ActivityType,
   today: Date
 ): 'rising' | 'stable' | 'falling' {
-  const currentLevel = calculateActivityLevel(activities, type, today);
+  const recentSum = sumActivityForDayRange(activities, type, today, 0, 6);
+  const priorSum = sumActivityForDayRange(activities, type, today, 7, 13);
 
-  const weekAgo = new Date(today);
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const pastLevel = calculateActivityLevel(activities, type, weekAgo);
+  if (priorSum === 0 && recentSum === 0) return 'stable';
+  if (priorSum === 0) return 'rising';
 
-  const delta = currentLevel - pastLevel;
-  if (delta > 0.05) return 'rising';
-  if (delta < -0.05) return 'falling';
+  const ratio = recentSum / priorSum;
+  if (ratio > 1.1) return 'rising';
+  if (ratio < 0.9) return 'falling';
   return 'stable';
+}
+
+function sumActivityForDayRange(
+  activities: DailyActivity[],
+  type: ActivityType,
+  today: Date,
+  startDaysAgo: number,
+  endDaysAgo: number
+): number {
+  let sum = 0;
+  for (let daysAgo = startDaysAgo; daysAgo <= endDaysAgo; daysAgo++) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - daysAgo);
+    const dateStr = toDateString(date);
+    sum += activities
+      .filter(a => a.type === type && a.date === dateStr)
+      .reduce((total, a) => total + a.value, 0);
+  }
+  return sum;
+}
+
+function toDateString(date: Date): string {
+  return date.toISOString().split('T')[0] as string;
 }

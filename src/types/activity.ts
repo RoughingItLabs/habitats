@@ -14,7 +14,7 @@ export interface DailyActivity {
   type: ActivityType;
   value: number;       // Steps, meters, minutes, etc.
   unit: string;
-  source: string;      // "healthkit" | "strava" | "manual"
+  source: string;      // "healthkit" | "health_connect" | "strava" | "manual"
 }
 
 export interface ActivitySummary {

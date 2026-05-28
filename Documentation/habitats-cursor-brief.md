@@ -2044,5 +2044,153 @@ Build the Friends tab with:
 ```
 
 ---
+ We are connecting real health data to the island.
+The app runs on Expo 56, Reanimated 4.4.0, Skia 2.6.4.
+
+Implement health data integration in this exact order.
+Do not move to the next step until the current one compiles and runs.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 1 — INSTALL & CONFIGURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Install these packages:
+  expo-health-connect       # Android Health Connect
+  react-native-health       # iOS HealthKit
+
+For expo-health-connect, add to app.json plugins:
+  ["expo-health-connect"]
+
+For react-native-health, add to app.json:
+  {
+    "plugin": "react-native-health",
+    "config": {
+      "NSHealthShareUsageDescription": "Habitats reads your activity to grow your island world.",
+      "NSHealthUpdateUsageDescription": "Habitats does not write health data.",
+      "healthKitPermissions": {
+        "read": [
+          "Steps",
+          "SleepAnalysis", 
+          "DistanceWalkingRunning",
+          "DistanceCycling",
+          "DistanceSwimming",
+          "ActiveEnergyBurned",
+          "Workout",
+          "MindfulSession",
+          "DietaryWater"
+        ],
+        "write": []
+      }
+    }
+  }
+
+Add to AndroidManifest.xml inside <manifest>:
+  <uses-permission android:name="android.permission.health.READ_STEPS"/>
+  <uses-permission android:name="android.permission.health.READ_SLEEP"/>
+  <uses-permission android:name="android.permission.health.READ_DISTANCE"/>
+  <uses-permission android:name="android.permission.health.READ_EXERCISE"/>
+  <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED"/>
+  <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED"/>
+
+Add Health Connect activity to AndroidManifest.xml inside <application>:
+  <activity
+    android:name="androidx.health.connect.client.PermissionController"
+    android:exported="true">
+    <intent-filter>
+      <action android:name="androidx.health.connect.client.SHOW_PERMISSIONS_RATIONALE"/>
+    </intent-filter>
+  </activity>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 2 — SHARED NORMALIZER
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create src/health/HealthNormalizer.ts
+
+This is the single output format everything converts to.
+Both HealthKit and Health Connect output must produce this:
+
+export interface DailyActivity {
+  date: string           // "YYYY-MM-DD"
+  type: ActivityType     // from src/types/activity.ts
+  value: number          // normalized unit (steps=count, sleep=minutes, distance=meters)
+  unit: string
+  source: string         // "healthkit" | "health_connect" | "strava" | "manual"
+}
+
+export interface NormalizedHealthData {
+  fetchedAt: Date
+  source: string
+  activities: DailyActivity[]
+}
+
+export function normalizeToActivitySummaries(
+  activities: DailyActivity[],
+  today: Date
+): ActivitySummary[] {
+  // For each ActivityType, call ZoneEngine.calculateActivityLevel()
+  // Return one ActivitySummary per type that has any data
+  // Include qualitative trend: compare last 7 days vs previous 7 days
+}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+STEP 3 — ANDROID: HEALTH CONNECT BRIDGE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Create src/health/HealthConnectBridge.ts
+
+import {
+  initialize,
+  requestPermission,
+  readRecords,
+  getSdkStatus,
+  SdkAvailabilityStatus,
+} from 'expo-health-connect'
+
+The bridge must implement this interface:
+export interface HealthBridge {
+  isAvailable(): Promise<boolean>
+  requestPermissions(): Promise<boolean>
+  fetchLast14Days(): Promise<NormalizedHealthData>
+}
+
+isAvailable():
+  Use getSdkStatus() — return true only if status === SdkAvailabilityStatus.SDK_AVAILABLE
+  If Health Connect not installed, return false (do not crash)
+
+requestPermissions():
+  Request these record types:
+  ['Steps', 'SleepSession', 'Distance', 'ExerciseSession', 
+   'ActiveCaloriesBurned', 'MindfulnessSession']
+  Return true if all granted, false if any denied
+
+fetchLast14Days():
+  Fetch each data type for last 14 days using readRecords()
+  Date range: startTime = 14 days ago 00:00:00, endTime = now
+
+  Steps → ActivityType 'steps', value = count per day (sum daily)
+  SleepSession → ActivityType 'sleep', value = duration in minutes
+    Only count sleep tagged as 'SLEEP_STAGE_T
 
 *Habitats — Tending & Social Systems v1.0 — Added to Cursor Brief*
+
+What's left, roughly in priority order:
+Must-have before it feels like a real app:
+
+Health data (HealthKit + Health Connect) — right now zones are static mock data. This is what makes the island yours
+Egg hatching sequence — the emotional payoff moment
+Creature stage visual differences — stage 1 should look genuinely tiny vs stage 4
+Supabase auth + basic cloud sync — so data survives app restarts
+Onboarding flow — the first 60 seconds matters enormously
+
+Makes it sticky:
+
+Narration Agent — island starts talking
+Tending tab — the gentle checklist
+Weekly reflection — reason to come back Mondays
+
+Makes it a product:
+
+Season pass + Moss Coins economy
+Friends + Driftgifts
+App Store assets + submission

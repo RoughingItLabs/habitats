@@ -12,6 +12,11 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
   ios: {
     bundleIdentifier: 'com.habitats.app',
     supportsTablet: true,
+    infoPlist: {
+      NSHealthShareUsageDescription:
+        'Habitats reads your activity to grow your island world.',
+      NSHealthUpdateUsageDescription: 'Habitats does not write health data.',
+    },
   },
   android: {
     package: 'com.habitats.app',
@@ -22,6 +27,23 @@ const config: ExpoConfig & { newArchEnabled?: boolean } = {
   plugins: [
     'expo-router',
     'expo-font',
+    'expo-health-connect',
+    [
+      'expo-build-properties',
+      {
+        android: {
+          minSdkVersion: 26,
+        },
+      },
+    ],
+    [
+      'react-native-health',
+      {
+        healthSharePermission:
+          'Habitats reads your activity to grow your island world.',
+        healthUpdatePermission: 'Habitats does not write health data.',
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,
